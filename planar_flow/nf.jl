@@ -2,7 +2,8 @@ using Distributions, LinearAlgebra, Plots
 using Bijectors
 using Bijectors: PlanarLayer 
 using Flux, Zygote
-using Zygote: Params, pullback
+# using ReverseDiff
+using Zygote
 using Optimisers
 using ProgressMeter
 using Plots
@@ -10,7 +11,7 @@ using Plots
 using Random
 Random.seed!(123)
 rng = Random.default_rng()
-
+##
 # Define a zero-mean banana-shaped distribution
 struct Banana <: ContinuousMultivariateDistribution
     d::Int            # Dimension
@@ -79,12 +80,7 @@ end
 function elbo(xs, flow::Bijectors.MultivariateTransformed, logp, logq)
     n_samples = size(xs, 2)
     elbo_values = map(x -> elbo_single_sample(x, flow, logp, logq), eachcol(xs))
-    
-    # log-sum-exp trick
-    max_elbo = maximum(elbo_values)
-    avg_elbo = log(sum(exp.(elbo_values .- max_elbo))) + max_elbo - log(n_samples)
-    
-    return avg_elbo
+    return sum(elbo_values) / n_samples
 end
 
 elbo(rng::AbstractRNG, flow::Bijectors.MultivariateTransformed, logp, logq, n_samples) = elbo(
@@ -130,7 +126,7 @@ function train!(
     losses = zeros(n_epochs)
     @showprogress 1 for i in 1:n_epochs
         losses[i] = loss(flow)
-        ∇flow = gradient(loss, flow)[1]
+        ∇flow = only(gradient(loss, flow))
         st, flow = Optimisers.update!(st, flow, ∇flow)
     end
     return losses, flow
@@ -138,6 +134,7 @@ end
 
 ##
 banana_dist = Banana(2, 0.1)
+visualize(banana_dist)
 flow = create_planar_flow(20, MvNormal(zeros(Float64, 2), I))
 flow_untrained = deepcopy(flow)
 
