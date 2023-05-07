@@ -84,7 +84,7 @@ function elbo(xs, flow::Bijectors.MultivariateTransformed, logp, logq)
 end
 
 elbo(rng::AbstractRNG, flow::Bijectors.MultivariateTransformed, logp, logq, n_samples) = elbo(
-    rand(rng, flow, n_samples), flow, logp, logq
+    rand(rng, flow.dist, n_samples), flow, logp, logq
 )
 
 function train_flatten!(
@@ -138,7 +138,7 @@ visualize(banana_dist)
 flow = create_planar_flow(20, MvNormal(zeros(Float64, 2), I))
 flow_untrained = deepcopy(flow)
 
-losses, flow_trained = train!(Random.GLOBAL_RNG, flow, banana_dist, 30000, 100)
+losses, flow_trained = train!(Random.GLOBAL_RNG, flow, banana_dist, 100000, 1)
 losses, flow_trained = train_flatten!(Random.GLOBAL_RNG, flow, banana_dist, 30000, 10)
 
 ##
