@@ -1,5 +1,5 @@
 using Distributions, Random, Plots, ProgressMeter, LinearAlgebra, Random
-using StatsBase, SpecialFunctions, Parameters, Bijectors
+using Bijectors
 using ProgressMeter, Flux, Bijectors, Zygote
 include("../utils/train.jl") # loading utility functions for optimization loops
 include("../utils/elbo.jl") # loading utility functions for elbo estimation
@@ -21,9 +21,9 @@ logp(x) = -log(Z) - 0.5 * ϕ_inv(x)' * C_inv * ϕ_inv(x) # log pdf of the target
 ################
 function lrelu_layer(xdims::Int; hdims::Int=20)
     nn = Chain(Flux.Dense(xdims, hdims, leakyrelu), Flux.Dense(hdims, hdims, leakyrelu), Flux.Dense(hdims, xdims))
-return nn
+    return nn
 end
-
+@functor lrelu_layer
 """
 coupling function for RealNVP "(θ function in Eq(1) of http://proceedings.mlr.press/v118/fjelde20a/fjelde20a.pdf)"
 """

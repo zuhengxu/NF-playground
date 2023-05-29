@@ -11,7 +11,6 @@ rng = Random.default_rng()
 # the banana distribution
 include("../../logpdfs/Banana.jl")
 
-
 # construct planar flow
 function create_planar_flow(n_trans::Int, q₀)
     d = length(q₀)
