@@ -43,6 +43,13 @@ function Distributions._logpdf(d::Banana, x::AbstractArray)
     return -log(Z) - 0.5 * ϕ⁻¹_x' * C⁻¹ * ϕ⁻¹_x
 end
 
+# fixing this
+function ∇logpdf(d::Banana, x::AbstractArray)
+    b =d.b
+    -[1/100 * x[1] + (x[2]-b*x[1]^2+100*b)*(-2*b*x[1]), x[2]-b*x[1]^2+100*b]
+end
+
+
 Distributions.mean(d::Banana) = zeros(d.d)
 Distributions.var(d::Banana) = diag(d.C)
 Distributions.cov(d::Banana) = d.C

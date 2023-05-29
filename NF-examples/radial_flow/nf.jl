@@ -12,10 +12,10 @@ rng = Random.default_rng()
 include("../../logpdfs/Banana.jl")
 
 
-# construct planar flow
-function create_planar_flow(n_trans::Int, q₀)
+# construct radial flow
+function create_radial_flow(n_trans::Int, q₀)
     d = length(q₀)
-    Ts = ∘([PlanarLayer(d) for _ in 1:n_trans]...)
+    Ts = ∘([RadialLayer(d) for _ in 1:n_trans]...)
     return transformed(q₀, Ts)
 end
 
@@ -82,11 +82,12 @@ end
 ##
 banana_dist = Banana(2, 0.1)
 visualize(banana_dist)
-flow = create_planar_flow(20, MvNormal(zeros(Float64, 2), I))
+flow = create_radial_flow(20, MvNormal(zeros(Float64, 2), I))
 flow_untrained = deepcopy(flow)
 
-losses, flow_trained = train!(Random.GLOBAL_RNG, flow, banana_dist, 100000, 1)
+losses, flow_trained = train!(Random.GLOBAL_RNG, flow, banana_dist, 200000, 1)
 # losses, flow_trained = train_flatten!(Random.GLOBAL_RNG, flow, banana_dist, 30000, 10)
+
 
 ##
 
