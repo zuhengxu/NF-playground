@@ -1,62 +1,76 @@
 using Flux
 using Functors
 using Bijectors
+using Bijectors:∘
 
-struct RealNVPLayer <: Bijectors.Bijector
+struct AffineCoupling <: Bijectors.Bijector
     D::Int
-    # Mask::Bijectors.PartitionMask
-    s::Chain
-    t::Chain
+    Mask::Bijectors.PartitionMask
+    s::Flux.Chain
+    t::Flux.Chain
 end
 
-@functor RealNVPLayer (s, t)
+# let params track field s and t
+@functor AffineCoupling (s, t)
 
-function RealNVPLayer(D::Int, dims::Int)
-    s = Chain(Dense(D, dims, relu), Dense(dims, D))
-    t = Chain(Dense(D, dims, relu), Dense(dims, D))
-    RealNVPLayer(D, s, t)
+function AffineCoupling(D::Int, hdims::Int, mask_idx::AbstractVector)
+    coupling_dim = D ÷ 2 # D is even
+    s = Chain(Dense(coupling_dim, hdims, leakyrelu), Dense(hdims, coupling_dim))
+    t = Chain(Dense(coupling_dim, hdims, leakyrelu), Dense(hdims, coupling_dim))
+    Mask = Bijectors.PartitionMask(D, mask_idx)
+    AffineCoupling(D, Mask, s, t)
 end
 
-r = RealNVPLayer(10, 20)
-p = Flux.params(r)
-
-r2 = RealNVPLayer(10, 20)
-
-T = ∘(r, r2)
-
-t1 = Bijectors.∘([PlanarLayer(20) for _ in 1:2]...)
-t2 = Bijectors.∘([PlanarLayer(20) for _ in 1:2]...)
-
-import Bijectors
-T = Bijector.∘(t1, t2)
-T1 = ∘(r, r2)
-T1(randn(20))
-
-
-Bijectors.forward(T, randn(20))
-
-function test(x)
-    sum(abs2, T1(x))
+function (af::AffineCoupling)(x::AbstractArray)
+    # partition vector using 'af.mask::PartitionMask`
+    x₁, x₂, x₃= Bijectors.partition(af.Mask, x)
+    y₁ = x₁ .* af.s(x₂) .+ af.t(x₂)
+    return Bijectors.combine(af.Mask, y₁, x₂, x₃)
 end
 
-using Zygote 
-gradient(test, rand(20))
 
-function (r::RealNVPLayer)(x::AbstractArray)
-    d = size(x, 1) ÷ 2
-    x₁, x₂ = x[1:d, :], x[d+1:end, :]
-    y₁ = x₁
-    y₂ = x₂ .* exp.(r.s(x₁)) .+ r.t(x₁)
-    vcat(y₁, y₂)
+function with_logabsdet_jacobian(af::AffinCoupling, x::AbstractVector)
+    x_1, x_2, x_3 = Bijectors.partition(af.mask, x)
+    y_1 = af.s(x_2) .* x_1 .+ af.t(x_2)
+    logjac = sum(log∘abs, af.s(x_1))
+    return combine(af.mask, y_1, x_2, x_3), logjac
 end
 
-# function Bijectors.forward(r::RealNVPLayer, )
-
-
-function (r_inverse::RealNVPLayer)(y::AbstractArray)
-    d = size(y, 1) ÷ 2
-    y₁, y₂ = y[1:d, :], y[d+1:end, :]
-    x₁ = y₁
-    x₂ = (y₂ .- r.t(y₁)) ./ exp.(r.s(y₁))
-    vcat(x₁, x₂)
+function with_logabsdet_jacobian(iaf::Inverse{<:AffineCoupling}, y::AbstractVector)
+    af = iaf.orig
+    # partition vector using `af.mask::PartitionMask`
+    y_1, y_2, y_3 = partition(af.mask, y)
+    # inverse transformation
+    x_1 = (y_1 .- af.t(y_2)) ./ af.s(y_2) 
+    logjac = -sum(log∘abs, af.s(x_1))
+    return combine(af.mask, x_1, y_2, y_3), logjac
 end
+
+
+function logabsdetjac(cl::Coupling, x::AbstractVector)
+    x_1, x_2, x_3 = partition(cl.mask, x)
+    logjac = sum(log∘abs, af.s(x_1))
+    return logjac
+end
+
+# D = 10
+# r1 = AffineCoupling(D, 20, 1:5)
+# r2 = AffineCoupling(D, 20, 6:10)
+
+# T = r1∘r2
+# T(randn(10))
+
+
+# transform
+
+
+
+# _logabsdetjac_scale 
+
+
+
+
+
+
+
+

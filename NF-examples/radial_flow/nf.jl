@@ -34,29 +34,6 @@ elbo(rng::AbstractRNG, flow::Bijectors.MultivariateTransformed, logp, logq, n_sa
     rand(rng, flow.dist, n_samples), flow, logp, logq
 )
 
-# function train_flatten!(
-#     rng::AbstractRNG, 
-#     flow::Bijectors.MultivariateTransformed, 
-#     p::Banana, 
-#     n_epochs::Int, 
-#     n_samples::Int
-# )
-#     logp = Base.Fix1(logpdf, p)
-#     logq = Base.Fix1(logpdf, flow.dist)
-
-#     flat, re = destructure(flow)
-#     rule = Optimisers.ADAM()
-#     st = Optimisers.setup(rule, flat)
-#     loss(x) = -elbo(rng, re(x), logp, logq, n_samples)
-#     losses = zeros(n_epochs)
-#     @showprogress 1 for i in 1:n_epochs
-#         losses[i] = loss(flat)
-#         ∇flat = gradient(loss, flat)
-#         st, flat = Optimisers.update!(st, flat, ∇flat[1])
-#     end
-#     return losses, re(flat)
-# end
-
 function train!(
     rng::AbstractRNG,
     flow::Bijectors.MultivariateTransformed,
