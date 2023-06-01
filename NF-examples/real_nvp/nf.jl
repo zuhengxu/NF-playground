@@ -84,8 +84,8 @@ function compare_trained_and_untrained_flow(flow_trained, flow_untrained, true_d
     samples_true = rand(true_dist, n_samples)
     
     scatter(samples_true[1, :], samples_true[2, :], label="True Distribution", color=:blue, markersize=2, alpha=0.5)
-    scatter!(samples_untrained[1, 1:2], samples_untrained[2, :], label="Untrained Flow", color=:red, markersize=2, alpha=0.5)
-    scatter!(samples_trained[1, 1:2], samples_trained[2, :], label="Trained Flow", color=:green, markersize=2, alpha=0.5)
+    scatter!(samples_untrained[1, :], samples_untrained[2, :], label="Untrained Flow", color=:red, markersize=2, alpha=0.5)
+    scatter!(samples_trained[1, :], samples_trained[2, :], label="Trained Flow", color=:green, markersize=2, alpha=0.5)
     
     xlabel!("X")
     ylabel!("Y")
