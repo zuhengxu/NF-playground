@@ -23,7 +23,6 @@ function lrelu_layer(xdims::Int; hdims::Int=20)
     nn = Chain(Flux.Dense(xdims, hdims, leakyrelu), Flux.Dense(hdims, hdims, leakyrelu), Flux.Dense(hdims, xdims))
     return nn
 end
-@functor lrelu_layer
 """
 coupling function for RealNVP "(θ function in Eq(1) of http://proceedings.mlr.press/v118/fjelde20a/fjelde20a.pdf)"
 """

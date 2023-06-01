@@ -1,76 +1,100 @@
-using Flux
-using Functors
+using Distributions, LinearAlgebra, Plots
 using Bijectors
-using Bijectors:∘
+using Bijectors: with_logabsdet_jacobian
+using Flux, Zygote
+using Optimisers
+using ProgressMeter
+using Random
+Random.seed!(123)
+rng = Random.default_rng()
 
-struct AffineCoupling <: Bijectors.Bijector
-    D::Int
-    Mask::Bijectors.PartitionMask
-    s::Flux.Chain
-    t::Flux.Chain
+include("AffineCoupling.jl")
+# the banana distribution, we will be testing on 4d banana
+include("../../logpdfs/Banana.jl")
+
+function create_AffineCoupling_flow(Ls::Union{Vector{AffineCoupling}, AffineCoupling}, q₀)
+    Ts = ∘(Ls...)
+    return transformed(q₀, Ts)
 end
 
-# let params track field s and t
-@functor AffineCoupling (s, t)
-
-function AffineCoupling(D::Int, hdims::Int, mask_idx::AbstractVector)
-    coupling_dim = D ÷ 2 # D is even
-    s = Chain(Dense(coupling_dim, hdims, leakyrelu), Dense(hdims, coupling_dim))
-    t = Chain(Dense(coupling_dim, hdims, leakyrelu), Dense(hdims, coupling_dim))
-    Mask = Bijectors.PartitionMask(D, mask_idx)
-    AffineCoupling(D, Mask, s, t)
+function elbo_single_sample(x, flow::Bijectors.MultivariateTransformed, logp, logq)
+    y, logabsdetjac = Bijectors.with_logabsdet_jacobian(flow.transform, x)
+    return logp(y) - logq(x) + logabsdetjac
 end
 
-function (af::AffineCoupling)(x::AbstractArray)
-    # partition vector using 'af.mask::PartitionMask`
-    x₁, x₂, x₃= Bijectors.partition(af.Mask, x)
-    y₁ = x₁ .* af.s(x₂) .+ af.t(x₂)
-    return Bijectors.combine(af.Mask, y₁, x₂, x₃)
+function elbo(xs, flow::Bijectors.MultivariateTransformed, logp, logq)
+    n_samples = size(xs, 2)
+    elbo_values = map(x -> elbo_single_sample(x, flow, logp, logq), eachcol(xs))
+    return sum(elbo_values) / n_samples
 end
 
+elbo(rng::AbstractRNG, flow::Bijectors.MultivariateTransformed, logp, logq, n_samples) = elbo(
+    rand(rng, flow.dist, n_samples), flow, logp, logq
+)
 
-function with_logabsdet_jacobian(af::AffinCoupling, x::AbstractVector)
-    x_1, x_2, x_3 = Bijectors.partition(af.mask, x)
-    y_1 = af.s(x_2) .* x_1 .+ af.t(x_2)
-    logjac = sum(log∘abs, af.s(x_1))
-    return combine(af.mask, y_1, x_2, x_3), logjac
+################
+# training
+###############
+function train!(
+    rng::AbstractRNG,
+    flow::Bijectors.MultivariateTransformed,
+    p::Banana,
+    n_epochs::Int,
+    n_samples::Int
+)
+    logp(x) = logpdf(p, @views(x[1:2])) + logpdf(p, @views(x[3:4]))
+    logq = Base.Fix1(logpdf, flow.dist)
+
+    rule = Optimisers.ADAM()
+    st = Optimisers.setup(rule, flow)
+    loss(flow) = -elbo(rng, flow, logp, logq, n_samples)
+    losses = zeros(n_epochs)
+    @showprogress 1 for i in 1:n_epochs
+        losses[i] = loss(flow)
+        ∇flow = only(gradient(loss, flow))
+        st, flow = Optimisers.update!(st, flow, ∇flow)
+    end
+    return losses, flow
 end
 
-function with_logabsdet_jacobian(iaf::Inverse{<:AffineCoupling}, y::AbstractVector)
-    af = iaf.orig
-    # partition vector using `af.mask::PartitionMask`
-    y_1, y_2, y_3 = partition(af.mask, y)
-    # inverse transformation
-    x_1 = (y_1 .- af.t(y_2)) ./ af.s(y_2) 
-    logjac = -sum(log∘abs, af.s(x_1))
-    return combine(af.mask, x_1, y_2, y_3), logjac
+##
+banana_dist = Banana(2, 0.1)
+visualize(banana_dist)
+Ls = [
+    AffineCoupling(4, 8, 1:2),
+    AffineCoupling(4, 8, 3:4),
+    AffineCoupling(4, 8, 1:2),
+    AffineCoupling(4, 8, 3:4),
+    # AffineCoupling(4, 8, 1:2),
+    # AffineCoupling(4, 8, 3:4),
+    # AffineCoupling(4, 8, 1:2),
+    # AffineCoupling(4, 8, 3:4),
+]
+
+
+flow = create_AffineCoupling_flow(Ls, MvNormal(zeros(Float64, 4), I))
+flow_untrained = deepcopy(flow)
+
+losses, flow_trained = train!(Random.GLOBAL_RNG, flow, banana_dist, 100000, 1)
+
+
+function compare_trained_and_untrained_flow(flow_trained, flow_untrained, true_dist, n_samples)
+    samples_trained = rand(flow_trained, n_samples)
+    samples_untrained = rand(flow_untrained, n_samples)
+    samples_true = rand(true_dist, n_samples)
+    
+    scatter(samples_true[1, :], samples_true[2, :], label="True Distribution", color=:blue, markersize=2, alpha=0.5)
+    scatter!(samples_untrained[1, 1:2], samples_untrained[2, :], label="Untrained Flow", color=:red, markersize=2, alpha=0.5)
+    scatter!(samples_trained[1, 1:2], samples_trained[2, :], label="Trained Flow", color=:green, markersize=2, alpha=0.5)
+    
+    xlabel!("X")
+    ylabel!("Y")
+    title!("Comparison of Trained and Untrained Flow (first two dims)")
+    
+    return current()
 end
 
+plot(losses, label="Loss", linewidth=2)
+compare_trained_and_untrained_flow(flow_trained, flow_untrained, banana_dist, 1000)
 
-function logabsdetjac(cl::Coupling, x::AbstractVector)
-    x_1, x_2, x_3 = partition(cl.mask, x)
-    logjac = sum(log∘abs, af.s(x_1))
-    return logjac
-end
-
-# D = 10
-# r1 = AffineCoupling(D, 20, 1:5)
-# r2 = AffineCoupling(D, 20, 6:10)
-
-# T = r1∘r2
-# T(randn(10))
-
-
-# transform
-
-
-
-# _logabsdetjac_scale 
-
-
-
-
-
-
-
-
+# Bijectors.with_logabsdet_jacobian(flow.transform, rand(4))
