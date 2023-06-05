@@ -15,10 +15,27 @@ struct NeuralSplineLayer{T} <: Bijectors.Bijector
     h::T # height (ys)
     d::T # derivative of the knots
     B::Real # bound of the knots
+
 end
 
 function MLP_3layer(input_dim::Int, hdims::Int, output_dim::Int; activation = Flux.leakyrelu)
     Chain(Flux.Dense(input_dim, hdims, activation), Flux.Dense(hdims, hdims, activation), Flux.Dense(hdims, output_dim))
+end
+
+function NeuralSplineLayer(
+    D::Int,  # dimension of input
+    hdims::Int, # dimension of hidden units for s and t
+    K::Int, # number of knots
+    mask_idx::AbstractVector, # index of dimensione that one wants to apply transformations on
+    B::Real # bound of the knots
+    )
+    num_of_transformed_dims = length(mask_idx)
+    input_dims = D - num_of_transformed_dims
+    w = [MLP_3layer(input_dims, hdims, K) for i in 1:num_of_transformed_dims]
+    h = [MLP_3layer(input_dims, hdims, K) for i in 1:num_of_transformed_dims]
+    d = [MLP_3layer(input_dims, hdims, K-1) for i in 1:num_of_transformed_dims]
+    Mask = Bijectors.PartitionMask(D, mask_idx)
+    NeuralSplineLayer(D, Mask, w, h, d, B)
 end
 
 # let params track field (w, h, d)
