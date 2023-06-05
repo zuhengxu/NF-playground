@@ -65,7 +65,7 @@ Ls = [
     AffineCoupling(4, 8, 3:4),
     AffineCoupling(4, 8, 1:2),
     AffineCoupling(4, 8, 3:4),
-    # AffineCoupling(4, 8, 1:2),
+    AffineCoupling(4, 8, 1:2)
     # AffineCoupling(4, 8, 3:4),
     # AffineCoupling(4, 8, 1:2),
     # AffineCoupling(4, 8, 3:4),

@@ -2,7 +2,6 @@ using Flux
 using Functors
 using Bijectors
 using Bijectors:∘, partition, combine, PartitionMask
-using LogExpFunctions: logsumexp
 import Bijectors:transform,with_logabsdet_jacobian,logabsdetjac
 
 
@@ -45,7 +44,7 @@ end
 function Bijectors.with_logabsdet_jacobian(af::AffineCoupling, x::AbstractVector)
     x_1, x_2, x_3 = Bijectors.partition(af.Mask, x)
     y_1 = exp.(af.s(x_2)) .* x_1 .+ af.t(x_2)
-    logjac = sum(af.s(x_2))
+    logjac = sum(af.s(x_2))  # logabsdetjac of exp is simply the argument
     return combine(af.Mask, y_1, x_2, x_3), logjac
 end
 
