@@ -1,8 +1,8 @@
 using Flux
 using Functors
 using Bijectors
-using Bijectors:∘, partition, PartitionMask
-import Bijectors:transform,with_logabsdet_jacobian,logabsdetjac, rqs_univariate, rqs_univariate_inverse, rqs_logabsdetjac
+using Bijectors: ∘, partition, PartitionMask
+import Bijectors: transform, with_logabsdet_jacobian, logabsdetjac, rqs_univariate, rqs_univariate_inverse, rqs_logabsdetjac
 
 
 """
@@ -17,7 +17,7 @@ struct NeuralSplineLayer{T} <: Bijectors.Bijector
     B::Real # bound of the knots
 end
 
-function MLP_3layer(input_dim::Int, hdims::Int, output_dim::Int; activation = Flux.leakyrelu)
+function MLP_3layer(input_dim::Int, hdims::Int, output_dim::Int; activation=Flux.leakyrelu)
     Chain(Flux.Dense(input_dim, hdims, activation), Flux.Dense(hdims, hdims, activation), Flux.Dense(hdims, output_dim))
 end
 
@@ -27,12 +27,12 @@ function NeuralSplineLayer(
     K::Int, # number of knots
     mask_idx::AbstractVector, # index of dimensione that one wants to apply transformations on
     B::Real # bound of the knots
-    )
+)
     num_of_transformed_dims = length(mask_idx)
     input_dims = D - num_of_transformed_dims
     w = [MLP_3layer(input_dims, hdims, K) for i in 1:num_of_transformed_dims]
     h = [MLP_3layer(input_dims, hdims, K) for i in 1:num_of_transformed_dims]
-    d = [MLP_3layer(input_dims, hdims, K-1) for i in 1:num_of_transformed_dims]
+    d = [MLP_3layer(input_dims, hdims, K - 1) for i in 1:num_of_transformed_dims]
     Mask = Bijectors.PartitionMask(D, mask_idx)
     NeuralSplineLayer(D, Mask, w, h, d, B)
 end
@@ -48,7 +48,7 @@ function instantiate_rqs(nsl::NeuralSplineLayer{<:Vector{<:Flux.Chain}}, x::Abst
     hs = Float64.(reduce(hcat, [h(x) for h in nsl.h]))
     ds = Float64.(reduce(hcat, [d(x) for d in nsl.d]))
     # TODO: need to ask whether there is a better way
-    return Bijectors.RationalQuadraticSpline(ws', hs', ds', nsl.B) 
+    return Bijectors.RationalQuadraticSpline(ws', hs', ds', nsl.B)
 end
 
 function Bijectors.transform(nsl::NeuralSplineLayer{<:Vector{<:Flux.Chain}}, x::AbstractVector)
@@ -62,12 +62,12 @@ end
 
 function Bijectors.transform(insl::Inverse{<:NeuralSplineLayer{<:Vector{<:Flux.Chain}}}, y::AbstractVector)
     nsl = insl.orig
-    y1, y2, y3 = partition(nsl.Mask, y) 
+    y1, y2, y3 = partition(nsl.Mask, y)
     # todo: improve
     Rqs = instantiate_rqs(nsl, y2)
     x1 = transform(Inverse(Rqs), y1)
     return combine(nsl.Mask, x1, y2, y3)
-end 
+end
 
 (nsl::NeuralSplineLayer{<:Vector{<:Flux.Chain}})(x::AbstractVector) = Bijectors.transform(nsl, x)
 
@@ -77,13 +77,13 @@ function Bijectors.logabsdetjac(nsl::NeuralSplineLayer{<:Vector{<:Flux.Chain}}, 
     # TODO: need to ask whether there is a better way
     # instantiate rqs knots and derivatives
     Rqs = instantiate_rqs(nsl, x_2)
-    logjac = logabsdetjac(Rqs, x_1) 
+    logjac = logabsdetjac(Rqs, x_1)
     return logjac
 end
-        
+
 function Bijectors.logabsdetjac(insl::Inverse{<:NeuralSplineLayer{<:Vector{<:Flux.Chain}}}, y::AbstractVector)
     nsl = insl.orig
-    y1, y2, y3 = partition(nsl.Mask, y) 
+    y1, y2, y3 = partition(nsl.Mask, y)
     # todo: improve
     Rqs = instantiate_rqs(nsl, y2)
     logjac = logabsdetjac(Inverse(Rqs), y1)
@@ -110,3 +110,14 @@ end
 # T(randn(4))
 # Bijectors.transform(r1, randn(4))
 
+
+# K = 10; B = 2
+# ws = randn(K)
+# hs = randn(K)
+# ds = randn(K-1)
+# Ws = randn(3, K)
+# Hs = randn(3, K)
+# Ds = randn(3, K-1)
+# ft = Float32
+# rqs = Bijectors.RationalQuadraticSpline(ws, hs, ds, B)
+# rqs1 = Bijectors.RationalQuadraticSpline(ft.(Ws), ft.(Hs), ft.(Ds), B)

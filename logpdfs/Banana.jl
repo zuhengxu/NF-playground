@@ -13,9 +13,9 @@ end
 
 # Constructor with additional scaling parameter s
 Banana(d::Int, b::Float64, s::Float64=100.0) = Banana(
-    d, b, sqrt(s * (2π)^d), 
-    Matrix(Diagonal(vcat(s, ones(d-1)))), 
-    Matrix(Diagonal(vcat(1/s, ones(d-1))))
+    d, b, sqrt(s * (2π)^d),
+    Matrix(Diagonal(vcat(s, ones(d - 1)))),
+    Matrix(Diagonal(vcat(1 / s, ones(d - 1))))
 )
 
 Base.length(d::Banana) = d.d
@@ -45,8 +45,8 @@ end
 
 # fixing this
 function ∇logpdf(d::Banana, x::AbstractArray)
-    b =d.b
-    -[1/100 * x[1] + (x[2]-b*x[1]^2+100*b)*(-2*b*x[1]), x[2]-b*x[1]^2+100*b]
+    b = d.b
+    -[1 / 100 * x[1] + (x[2] - b * x[1]^2 + 100 * b) * (-2 * b * x[1]), x[2] - b * x[1]^2 + 100 * b]
 end
 
 
@@ -55,8 +55,8 @@ Distributions.var(d::Banana) = diag(d.C)
 Distributions.cov(d::Banana) = d.C
 
 function visualize(d::Banana, samples=rand(d, 1000))
-    xrange = range(minimum(samples[1, :])-1, maximum(samples[1, :])+1, length=100)
-    yrange = range(minimum(samples[2, :])-1, maximum(samples[2, :])+1, length=100)
+    xrange = range(minimum(samples[1, :]) - 1, maximum(samples[1, :]) + 1, length=100)
+    yrange = range(minimum(samples[2, :]) - 1, maximum(samples[2, :]) + 1, length=100)
     z = [exp(Distributions.logpdf(d, [x, y])) for x in xrange, y in yrange]
     contour(xrange, yrange, z', levels=15, color=:viridis, label="PDF", linewidth=2)
     scatter!(samples[1, :], samples[2, :], label="Samples", alpha=0.3, legend=:bottomright)

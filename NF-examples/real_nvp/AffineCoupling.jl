@@ -101,3 +101,8 @@ end
 
 # using Zygote
 # Zygote.gradient(test, x0)
+
+
+# X = randn(2)
+# mask = Bijectors.PartitionMask(2, 1:1)
+# x1, x2, x3 = Bijectors.partition(mask, X)
